@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Kaggle local test",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "scripts/run_local_test.sh"
+            ],
+            "group": "test",
+            "problemMatcher": []
+        }
+    ]
+}

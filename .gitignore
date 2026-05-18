@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Notebook
+.ipynb_checkpoints/
+
+# Project outputs
+results/
+submission/
+artifacts/
+
+# Local secrets / env
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
