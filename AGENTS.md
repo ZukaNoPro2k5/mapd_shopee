@@ -1,6 +1,6 @@
 # MAPD Graph Shopee — ghi chú nền cho agent sau
 
-> Snapshot đã kiểm tra ngày **2026-05-19** từ:
+> Snapshot gốc đã kiểm tra ngày **2026-05-19** và re-verify ngày **2026-05-20** từ:
 > 1. trang Kaggle `minhhhtrann/graph-shopee`,
 > 2. bundle public dataset **version 3**,
 > 3. ảnh thông báo cập nhật đề do nhóm cung cấp.
@@ -16,6 +16,7 @@
   - bundle Kaggle v3 chính thức ở root: `env.py`, `run_test.py`, `test_config.txt`
   - solver mẫu/stub chính thức trong `solvers/`
   - `smoke_config.txt` + script smoke test nhẹ để bắt lỗi local
+- Sau đính chính chiến lược ngày **2026-05-20**, mỗi solver nên **tự đứng độc lập trong file của nó**; không dùng helper chung giữa Greedy/VRP/ACO/MAPD-CBS.
 - Quy ước hạ tầng của nhóm:
   - **local chỉ chạy smoke test vài giây**
   - các lượt chạy nặng trên `test_config.txt`/full map để Kaggle xử lý
@@ -27,6 +28,7 @@
 - License: MIT
 - Version hiện tại đã kiểm tra: **v3**
 - Mốc update của v3: **2026-05-15**
+- Re-verify ngày **2026-05-20**: Kaggle public vẫn là `currentVersionNumber = 3`.
 - Mô tả trang Kaggle ghi đề chính thức, Phase 1/2, thang điểm, ràng buộc chạy và công thức thưởng.
 
 ### Bundle public v3 tải được thực tế
@@ -42,6 +44,18 @@ solvers/
 ├── solver.py
 └── vrp_ortools.py
 ```
+
+### File cấm đã kiểm tra
+
+Ngày **2026-05-20**, đã tải lại bundle public Kaggle v3 và đối chiếu byte-for-byte:
+
+| File | Trạng thái | SHA-256 |
+|---|---|---|
+| `env.py` | Match Kaggle v3 | `aaeeb78f504d5485730ce5e3d0ac722a0420c82fbfc949d4a707b4a78c989dbd` |
+| `run_test.py` | Match Kaggle v3 | `877589ec6a46023d5da0f18ca1c593ba2ea3cc57fa33256125bbd53bf067e4ff` |
+| `test_config.txt` | Match Kaggle v3 | `781b45abe34bb044b29872811735f492282cb271c50e244073cf5a1c163d9cf9` |
+
+Không sửa 3 file này trừ khi Kaggle/giảng viên phát hành version mới hơn.
 
 ### Lệch cần nhớ
 
