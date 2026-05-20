@@ -8,6 +8,16 @@ Gợi ý tổ chức:
 - `vrp_ortools.py`
 - `aco.py`
 - `mapd_cbs.py`
-- `utils.py`
 
 Ưu tiên giữ mỗi solver là một module rõ ràng để dễ test, review, và so sánh kết quả.
+
+
+## Nhịp làm việc khuyến nghị
+
+Sau mỗi thay đổi nhỏ trong một solver, chỉ chạy smoke test local vài giây:
+
+```bash
+bash scripts/run_local_test.sh GreedyBFS
+```
+
+Khi đã qua smoke test và muốn so điểm thật, mới đẩy lên Kaggle để chạy `test_config.txt`/full map.

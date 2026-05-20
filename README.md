@@ -6,11 +6,13 @@ Repo nền cho bài MAPD Graph Shopee. Mục tiêu của repo này là:
 - làm việc chung qua Git + VS Code
 - giữ phần chạy đánh giá Kaggle tách biệt, không sửa file grader
 
-## Cấu trúc dự kiến
+## Cấu trúc chính
 
 - `solvers/`: nơi đặt các solver và helper code
 - `run_test.py`: grader/test harness lấy từ Kaggle, không sửa
 - `test_config.txt`: config test lấy từ Kaggle, không sửa
+- `smoke_config.txt`: config mini cho local smoke test, không dùng để so chất lượng thuật toán
+- `scripts/run_local_test.sh`: entrypoint local mặc định, chỉ chạy smoke test
 - `results/`: output sinh ra khi chạy test local, không commit
 - `submission/`: bản đóng gói để nộp Kaggle nếu cần
 
@@ -19,19 +21,30 @@ Repo nền cho bài MAPD Graph Shopee. Mục tiêu của repo này là:
 - Mỗi nhánh Git nên bám một việc nhỏ: một solver, một tối ưu, hoặc một bugfix
 - Không sửa trực tiếp file grader/config gốc trừ khi đúng luồng nộp bài
 - Notebook Kaggle chỉ nên là lớp gọi lệnh, logic chính để trong `solvers/`
+- Luồng chạy chính thức phải **offline-ready**: không phụ thuộc `pip install`, `npm install`, tải file, hay gọi internet lúc chấm
 
 ## Chạy thử local
 
-Khi đã có bộ file Kaggle đầy đủ trong repo, dùng:
-
-```bash
-python run_test.py --config test_config.txt --out results/ --seed 42
-```
-
-Hoặc chạy script wrapper:
+Máy local chỉ dùng để bắt lỗi nhanh. Mặc định chạy smoke test vài giây:
 
 ```bash
 bash scripts/run_local_test.sh
+```
+
+Hoặc chỉ định solver đang sửa:
+
+```bash
+bash scripts/run_local_test.sh GreedyBFS
+bash scripts/run_local_test.sh VRPOrToolsSolver
+bash scripts/run_local_test.sh all
+```
+
+Smoke test dùng `smoke_config.txt`, chỉ để bắt lỗi import/action/vòng lặp, **không dùng để đánh giá chất lượng thuật toán**.
+
+Các lượt chạy nặng trên `test_config.txt` hoặc full map nên để Kaggle xử lý:
+
+```bash
+python run_test.py --method GreedyBFS --config test_config.txt --out results/ --seed 42
 ```
 
 ## Gợi ý VS Code
@@ -39,4 +52,3 @@ bash scripts/run_local_test.sh
 - mở root repo này bằng VS Code
 - cài extension Python và Jupyter
 - bật lưu file tự động nếu team thích workflow nhanh
-

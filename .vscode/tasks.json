@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Run Kaggle local test",
+            "label": "Run smoke test",
             "type": "shell",
             "command": "bash",
             "args": [
