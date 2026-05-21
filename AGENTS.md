@@ -1,8 +1,8 @@
 # MAPD Graph Shopee — ghi chú nền cho agent sau
 
-> Snapshot gốc đã kiểm tra ngày **2026-05-19** và re-verify ngày **2026-05-20** từ:
+> Snapshot gốc đã kiểm tra ngày **2026-05-19**; re-verify v3 ngày **2026-05-20**; update mới nhất v6 ngày **2026-05-21** từ:
 > 1. trang Kaggle `minhhhtrann/graph-shopee`,
-> 2. bundle public dataset **version 3**,
+> 2. bundle public dataset **version 6**,
 > 3. ảnh thông báo cập nhật đề do nhóm cung cấp.
 >
 > Mục tiêu của file này: cho agent mới đủ ngữ cảnh để bắt tay vào code mà không phải đọc lại toàn bộ đề, nhưng vẫn biết đâu là “nguồn sự thật” cần kiểm tra lại trước khi nộp.
@@ -12,10 +12,12 @@
 - Đây là repo làm việc chung qua Git + VS Code cho bài tập **Tối ưu hóa giao hàng đa tác tử thời gian thực**.
 - Logic nhóm tự viết nên nằm trong `solvers/`.
 - Kaggle dùng để chạy các thử nghiệm/full map và nộp notebook; repo local dùng để phát triển, review, chia nhánh.
-- Sau lần setup ngày **2026-05-19**, repo local đã có:
-  - bundle Kaggle v3 chính thức ở root: `env.py`, `run_test.py`, `test_config.txt`
+- Sau lần setup ngày **2026-05-19** và update v6 ngày **2026-05-21**, repo local đã có:
+  - bundle Kaggle v6 chính thức ở root: `env.py`, `run_test.py`, `test_config.txt`
   - solver mẫu/stub chính thức trong `solvers/`
   - `smoke_config.txt` + script smoke test nhẹ để bắt lỗi local
+  - `smoke_suite_config.txt` + `scripts/run_smoke_suite.sh` để chạy thêm vài case local nhẹ:
+    `FIXED_*` có tham số sinh đơn cố định, `RAND_*` để env tự resolve tham số sinh đơn ẩn
 - Sau đính chính chiến lược ngày **2026-05-20**, mỗi solver nên **tự đứng độc lập trong file của nó**; không dùng helper chung giữa Greedy/VRP/ACO/MAPD-CBS.
 - Quy ước hạ tầng của nhóm:
   - **local chỉ chạy smoke test vài giây**
@@ -26,12 +28,12 @@
 - Dataset: `Graph_Shopee`
 - Chủ dataset: `Minhhh Trann`
 - License: MIT
-- Version hiện tại đã kiểm tra: **v3**
-- Mốc update của v3: **2026-05-15**
-- Re-verify ngày **2026-05-20**: Kaggle public vẫn là `currentVersionNumber = 3`.
+- Version hiện tại đã kiểm tra: **v6**
+- Mốc update của v6: **2026-05-21**
+- Re-verify ngày **2026-05-21**: Kaggle public là `currentVersionNumber = 6`.
 - Mô tả trang Kaggle ghi đề chính thức, Phase 1/2, thang điểm, ràng buộc chạy và công thức thưởng.
 
-### Bundle public v3 tải được thực tế
+### Bundle public v6 tải được thực tế
 
 ```text
 env.py
@@ -47,21 +49,21 @@ solvers/
 
 ### File cấm đã kiểm tra
 
-Ngày **2026-05-20**, đã tải lại bundle public Kaggle v3 và đối chiếu byte-for-byte:
+Ngày **2026-05-21**, đã tải lại bundle public Kaggle v6 và đối chiếu byte-for-byte:
 
 | File | Trạng thái | SHA-256 |
 |---|---|---|
-| `env.py` | Match Kaggle v3 | `aaeeb78f504d5485730ce5e3d0ac722a0420c82fbfc949d4a707b4a78c989dbd` |
-| `run_test.py` | Match Kaggle v3 | `877589ec6a46023d5da0f18ca1c593ba2ea3cc57fa33256125bbd53bf067e4ff` |
-| `test_config.txt` | Match Kaggle v3 | `781b45abe34bb044b29872811735f492282cb271c50e244073cf5a1c163d9cf9` |
+| `env.py` | Match Kaggle v6 | `6fc2168187477fb4c81d5a814dd917b1f1b6490fb2b5a315c9cf6b8ec14a2051` |
+| `run_test.py` | Match Kaggle v6 | `f9509950d319583a236b07283e11964490d7619ccd6e11e32b62ac3c85467564` |
+| `test_config.txt` | Match Kaggle v6 | `bd8fea414a730c17c590838bbe1f2ded8f399bee28a7b45ac67117e8e8d3db9f` |
 
-Không sửa 3 file này trừ khi Kaggle/giảng viên phát hành version mới hơn.
+Không sửa 3 file này thủ công; chỉ cập nhật nguyên bản khi Kaggle/giảng viên phát hành version mới hơn.
 
 ### Lệch cần nhớ
 
 - Mô tả trang Kaggle nói file được cấp gồm `run_test.py`, `test_config.txt`, `demo_notebook.ipynb`.
-- Nhưng zip dataset public v3 tải được ở snapshot này **không chứa** `demo_notebook.ipynb`; thay vào đó có thêm `env.py` và các solver mẫu/stub.
-- Mô tả trang Kaggle vẫn ghi `cargo_op = 2 [id]`, nhưng code v3 + ảnh thông báo mới cho thấy semantics thực tế đã đổi thành `cargo_op = 2` để giao nhiều đơn cùng đích; khi có lệch, bám theo **bundle v3 + notebook mới nhất + thông báo giảng viên**, không bám mù vào text cũ.
+- Nhưng zip dataset public v6 tải được ở snapshot này **không chứa** `demo_notebook.ipynb`; thay vào đó có thêm `env.py` và các solver mẫu/stub.
+- Mô tả trang Kaggle vẫn ghi `cargo_op = 2 [id]`, nhưng code v6 + ảnh thông báo mới cho thấy semantics thực tế đã đổi thành `cargo_op = 2` để giao nhiều đơn cùng đích; khi có lệch, bám theo **bundle v6 + notebook mới nhất + thông báo giảng viên**, không bám mù vào text cũ.
 - Notebook công khai trong Code tab đã kiểm tra:
   - `Graph Shopee v1`
   - ref `minhhhtrann/graph-shopee-v1`
@@ -89,7 +91,7 @@ g_i = <sx, sy, ex, ey, et, w, p>
   - `1 giờ = 10` time units
   - `1 ngày = 240` time units
 
-## 4. Semantics môi trường phải bám theo v3
+## 4. Semantics môi trường phải bám theo v6
 
 Đây là phần quan trọng nhất. Nếu solver lệch semantics này thì điểm thử local có thể đẹp nhưng sai môi trường chấm.
 
@@ -98,7 +100,7 @@ g_i = <sx, sy, ex, ey, et, w, p>
 - **Chỉ `G` được biết từ đầu.**
 - Đơn hàng không sinh sẵn toàn bộ lúc `t=0`.
 - `DeliveryEnv` chỉ reveal đơn đang xuất hiện theo từng thời điểm; observation hiện tại chỉ chứa các đơn đã xuất hiện và chưa giao.
-- Trong v3, vòng bước của env là:
+- Trong v6, vòng bước của env là:
 
 ```text
 move -> pickup -> delivery -> t += 1 -> reveal đơn mới cho bước kế
@@ -129,7 +131,7 @@ Ràng buộc update mới:
    - id nhỏ hơn.
 3. Với **delivery**, có thể giao **nhiều đơn** trong cùng timestep nếu chúng có cùng tọa độ đích hiện tại.
 4. Trong cùng timestep, mỗi shipper chỉ làm **một trong ba** cargo action: `0`, pickup, hoặc delivery. Không pickup và delivery cùng lúc.
-5. Trong code v3, `cargo_op = 2` **không truyền id**; env duyệt toàn bộ `bag` và giao mọi đơn hợp lệ tại vị trí hiện tại.
+5. Trong code v6, `cargo_op = 2` **không truyền id**; env duyệt toàn bộ `bag` và giao mọi đơn hợp lệ tại vị trí hiện tại.
 
 ### 4.3. Va chạm và di chuyển
 
@@ -168,6 +170,14 @@ r = beta_p * r_base * max(0, 1 - (t_delivery - et) / T)
 beta = {1:0.1, 2:0.3, 3:0.5}
 ```
 
+
+### Đính chính surge/hotspot ngày 2026-05-21
+
+- Giảng viên xác nhận: **không được truy cập hoặc dựa vào tham số surge/hotspot trong cả Phase 1 lẫn Phase 2**.
+- Câu “Phase 2 công bố surge/hotspot” trong mô tả cũ chỉ được hiểu là config để test/chấm; chương trình solver không được xây tối ưu dựa trên các tham số này.
+- Dataset v6 update `env.py` để không expose `cfg/public_cfg`, và `solver.py` bỏ `self.cfg = env.public_cfg`.
+- Solver hợp lệ chỉ dùng observation public từ `env.observe()`/`env.step()` và các thuộc tính public cần thiết như `env.grid`, `env.G`, `env.T`, `env.config_name`; không introspect private attrs như `__hotspots`, `__surge_windows`.
+
 ## 5. Sinh đơn, surge, hotspot
 
 - Đơn xuất hiện theo Poisson không đồng nhất.
@@ -180,35 +190,19 @@ beta = {1:0.1, 2:0.3, 3:0.5}
   - `surge_windows` và `hotspots` không công bố trong `test_config.txt`
   - env tự resolve tham số ẩn nếu thiếu
 - Phase 2:
-  - surge/hotspot được công bố đầy đủ
+  - theo đính chính Zalo 2026-05-21, solver vẫn không được truy cập/dựa vào surge/hotspot
 
-### 5.1. Tham số ẩn/code-level đáng nhớ trong `env.py`
+### 5.1. Ranh giới thông tin hợp lệ cho solver
 
-- Nếu config không có `lambda0`, env dùng `G / T`.
-- Nếu config Phase 1 không có surge/hotspot:
-  - số surge window: `1` khi `N <= 10`, ngược lại `2`
-  - số hotspot: `min(max(1, C // 2), 3)`
-  - `surge_amplitude`:
-    - `2.0` cho `C1`
-    - `2.5` khi `N <= 12`
-    - `3.0` với map lớn hơn
-  - thời lượng mỗi surge: `max(20, min(T // 5, 120))`
-  - tham số ẩn được sinh ổn định theo hash của `seed + config_name`
-- Phân phối sinh order:
-  - priority `1/2/3` có trọng số `0.5 / 0.3 / 0.2`
-  - weight lấy trong `{0.1, 1.0, 5.0, 15.0, 40.0}` với trọng số `0.2 / 0.4 / 0.25 / 0.1 / 0.05`
-  - deadline:
+- Solver **không được** đọc trực tiếp tham số sinh đơn, surge window, hotspot, lambda, amplitude, hoặc private attrs trong `DeliveryEnv`.
+- Không dùng kỹ thuật introspection/name-mangling để truy cập các trường kiểu `__hotspots`, `__surge_windows`, `__lambda0`, v.v.
+- Từ v6, `Solver` base class không còn `self.cfg`; mọi thuật toán phải ra quyết định từ observation public hiện tại.
+- Có thể dùng các tín hiệu quan sát hợp lệ như:
+  - `obs["t"]`, `obs["orders"]`, `obs["new_order_ids"]`, `obs["shippers"]`, `obs["grid"]`;
+  - thuộc tính public cần thiết như `env.grid`, `env.G`, `env.T`, `env.config_name`.
+- Nếu báo cáo cần nói về surge/hotspot, chỉ mô tả chiến lược **thích nghi từ đơn đã xuất hiện** như nhận diện cụm pickup/delivery từ `orders` hiện tại, không nói là dùng tham số thật của env.
 
-```text
-min(t + randint(1,6) * (4 - priority) * 10, T - 1)
-```
-
-- Vị trí xuất phát shipper:
-  - ưu tiên các neo gần 4 góc + tâm
-  - nếu chưa đủ `C`, chọn tiếp theo kiểu max-min distance để trải đều
-- `Solver` base class nhận `env.public_cfg`, nên solver chuẩn **không nhìn thấy** surge/hotspot ẩn của Phase 1.
-
-## 6. Các file v3 cần hiểu trước khi sửa solver
+## 6. Các file v6 cần hiểu trước khi sửa solver
 
 ### `env.py`
 
@@ -267,7 +261,7 @@ cp -r ../input/datasets/minhhhtrann/graph-shopee ./
   5. chạy evaluator:
 
 ```bash
-python run_test.py --method GreedyBFS --config test_config.txt --out results --seed 42
+python run_test.py --method GreedyBFS --config test_config.txt --out results
 ```
 
 - Ghi chú của notebook: danh sách file và hash giữa Phase 1 và Phase 2 phải khớp nhau.
@@ -281,20 +275,20 @@ python run_test.py --method GreedyBFS --config test_config.txt --out results --s
 
 ### `solvers/`
 
-- `greedy_bfs.py`: baseline có cài thật, chạy online trên observation hiện tại.
+- `greedy_bfs.py`: nhóm đã thay bằng bản Greedy self-contained, chạy online trên observation hiện tại, không đọc cfg/surge/hotspot.
 - `vrp_ortools.py`, `aco_solver.py`, `mapd_cbs_solver.py`: mới là stub/TODO trong bundle mẫu.
-- `solver.py`: base class và `default_result()`.
+- `solver.py`: base class v6, không còn `self.cfg`; stubs gọi `default_result(method, env.config_name, env.G, orders)`.
 
-### `test_config.txt` Phase 1 v3
+### `test_config.txt` Phase 1 v6
 
 | Config | N | C | G | T | K_max | W_max |
 |---|---:|---:|---:|---:|---|---|
 | C1 | 7 | 2 | 15 | 240 | `3 3` | `20 20` |
 | C2 | 10 | 2 | 25 | 240 | `3 3` | `20 30` |
 | C3 | 12 | 3 | 40 | 360 | `3 2 3` | `20 30 20` |
-| C4 | 15 | 4 | 60 | 480 | `3 3 2 2` | `20 20 30 30` |
-| C5 | 18 | 5 | 80 | 600 | `3 3 2 2 3` | `20 20 30 30 20` |
-| C6 | 20 | 5 | 100 | 720 | `3 3 2 2 3` | `20 20 30 30 20` |
+| C4 | 15 | 4 | 60 | 600 | `3 3 2 2` | `20 20 30 30` |
+| C5 | 18 | 5 | 80 | 780 | `3 3 2 2 3` | `20 20 30 30 20` |
+| C6 | 20 | 5 | 100 | 960 | `3 3 2 2 3` | `20 20 30 30 20` |
 
 - Tất cả map có obstacle/bottleneck.
 - Ảnh thông báo của giảng viên nói **`test_config.txt` Phase 1 cũng đã được update** ở lần đổi này; không dùng bản cũ.
@@ -343,7 +337,7 @@ python run_test.py --method GreedyBFS --config test_config.txt --out results --s
 - Chạy chuẩn:
 
 ```bash
-python run_test.py --config test_config.txt --out results/ --seed 42
+python run_test.py --config test_config.txt --out results/
 ```
 
 - Upload thư mục `solvers/` của nhóm lên Kaggle dưới dạng Dataset và để public đúng deadline Phase 1.
@@ -385,9 +379,49 @@ move_cost(w_carried, w_max) = -0.01 * (1 + GAMMA * w_carried / max(w_max, 1.0))
 9. **Giữ notebook mỏng**; mọi logic thật để trong repo/`solvers/`, vì đây cũng là cách team đang phối hợp qua Git.
 10. **Không trói các thuật toán bằng helper chung**: sau Phase 1 có thể chỉ chọn một method để chạy Phase 2, nên mỗi solver nên tự chứa logic cần thiết của nó. Greedy BFS hiện tự chứa BFS/scoring/conflict local trong `greedy_bfs.py`.
 
-## 10. Việc agent sau nên làm đầu tiên
+## 10. Checklist handoff nhanh cho các bạn cùng nhóm
 
-1. Kiểm tra Kaggle có version mới hơn v3 chưa.
+Phần này dành cho người/agent mới vào repo, đặc biệt khi đang vibe coding để không vô tình phá luật chấm.
+
+### Luật không được vi phạm
+
+- **Không sửa thủ công** `env.py`, `run_test.py`, `test_config.txt`. Nếu Kaggle ra version mới thì update nguyên bản và ghi lại hash.
+- **Không đọc thông tin ẩn**: không truy cập `cfg/public_cfg`, private attrs của env, surge/hotspot/lambda/amplitude thật.
+- **Không dùng internet/cài package lúc chạy**: không `pip install`, `npm install`, `curl`, `wget`, `requests`, v.v. trong luồng chấm.
+- **Không fit cứng public test**: tránh logic kiểu `if config_name == "C6"`; nếu cần adaptive thì dùng đặc trưng tổng quát như `N`, `C`, `T`, bag size, visible orders, obstacle pattern public.
+- **Không tạo helper chung bắt buộc giữa 4 solver**. Mỗi solver phải tự chạy được nếu Phase 2 chỉ chọn đúng method đó.
+
+### Hiểu đúng điểm chạy
+
+- `net_reward` là điểm objective của simulator, không phải điểm môn.
+- `run_test.py` cộng `net_reward` qua các config để ra `total_score_by_method`.
+- Public `test_config.txt` hiện có C1-C6 để dev/báo cáo; Phase 2 có thể update config ranking mới. Vì vậy tối ưu public score nhưng vẫn phải giữ thuật tổng quát.
+- Smoke test chỉ bắt lỗi import/action/loop, **không** dùng để kết luận thuật mạnh hay yếu.
+
+### Hiểu đúng thời gian và số đơn
+
+- `T` là số timestep trong game/simulation, không phải giây thật.
+- `G` là tổng số đơn hữu hạn trong config; đơn được reveal dần, solver chỉ thấy đơn đã lộ diện.
+- Giới hạn `3600s` là wall-clock runtime thật của notebook/evaluator. Không cần dùng hết 1 tiếng; càng nhanh càng an toàn.
+- Episode thường chạy đến `t >= T`; nếu giao hết sớm thì solver vẫn nên trả action hợp lệ/đứng yên đến hết mô phỏng.
+
+### Chính sách dependency cho VRP + OR-Tools
+
+- Local hiện tại **không import được `ortools`**. Không giả định Kaggle có sẵn nếu chưa check trực tiếp trong notebook chấm.
+- Không vendor/copy OR-Tools binary vào `solvers/` trừ khi giảng viên xác nhận rõ là được phép. Đây là vùng xám vì OR-Tools có native binary, nhiều file, phụ thuộc Python/Kaggle image.
+- `vrp_ortools.py` nên có fallback stdlib:
+  - nếu import được OR-Tools thì dùng rolling-horizon VRP nhỏ;
+  - nếu không import được thì dùng VRP-inspired greedy insertion/assignment để method vẫn chạy offline.
+
+### Khi sửa solver
+
+- Greedy BFS đang là solver thật, self-contained, không đọc thông tin ẩn; giữ tính chất này khi chỉnh tiếp.
+- Chỉ dùng `test_config.txt` để regression/probe, không ghi con số benchmark vào luật agent và không hardcode theo public config.
+- Khi tối ưu, ghi chú lý do ở mức thuật toán tổng quát: scoring, assignment, route ordering, conflict handling, fallback dependency.
+
+## 11. Việc agent sau nên làm đầu tiên
+
+1. Kiểm tra Kaggle có version mới hơn v6 chưa.
 2. Nếu Kaggle chưa đổi version, chạy smoke test local trước khi sửa thuật toán:
 
 ```bash
@@ -400,5 +434,11 @@ bash scripts/run_local_test.sh
 bash scripts/run_local_test.sh GreedyBFS
 ```
 
-4. Khi cần điểm thật/baseline thật, chạy trên Kaggle bằng `test_config.txt`; không biến local thành runner full map.
-5. Nếu notebook Kaggle mới nhất có tên method/luồng nộp khác, cập nhật note này trước rồi mới tối ưu tiếp.
+4. Khi cần kiểm tra đa dạng hơn nhưng vẫn nhẹ:
+
+```bash
+bash scripts/run_smoke_suite.sh GreedyBFS
+```
+
+5. Khi cần điểm thật/baseline thật, chạy trên Kaggle bằng `test_config.txt`; không biến local thành runner full map.
+6. Nếu notebook Kaggle mới nhất có tên method/luồng nộp khác, cập nhật note này trước rồi mới tối ưu tiếp.

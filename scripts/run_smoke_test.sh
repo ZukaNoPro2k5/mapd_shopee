@@ -21,5 +21,4 @@ mkdir -p results/smoke
 python3 run_test.py \
   --method "$METHOD" \
   --config smoke_config.txt \
-  --out results/smoke \
-  --seed 42
+  --out results/smoke

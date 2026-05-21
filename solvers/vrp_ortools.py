@@ -11,4 +11,4 @@ class VRPOrToolsSolver(Solver):
 
     def run(self) -> dict:
         # TODO: mô hình hóa các đơn đã quan sát thành bài toán VRP động và trả về dict kết quả.
-        return default_result("VRP-OrTools", self.cfg, self.orders)
+        return default_result("VRP-OrTools", self.env.config_name, self.env.G, self.orders)

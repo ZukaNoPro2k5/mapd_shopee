@@ -11,4 +11,4 @@ class MAPDCBSSolver(Solver):
 
     def run(self) -> dict:
         # TODO: sinh task, chạy CBS, mô phỏng và trả về dict kết quả.
-        return default_result("MAPD-CBS", self.cfg, self.orders)
+        return default_result("MAPD-CBS", self.env.config_name, self.env.G, self.orders)
