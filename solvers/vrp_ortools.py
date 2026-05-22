@@ -26,6 +26,12 @@ _W_DIST    = 0.10   # penalty mỗi bước khoảng cách
 _W_PRIO    = 5.0    # bonus theo priority
 _W_CLUSTER = 6.0    # bonus nếu cùng điểm giao với đơn đang mang
 _URGENT_SLACK = 5   # bước còn trước deadline → coi là urgent
+_ENDGAME_FRAC = 0.15  # phần cuối T → ưu tiên giao hàng
+
+
+def _est_delivery_t(t: int, d_to_pickup: int, d_trip: int) -> int:
+    """Ước tính thời điểm giao hàng: pickup + trip, trừ 1 bước vì move+pickup cùng timestep."""
+    return t + max(d_to_pickup - 1, 0) + d_trip
 
 
 class VRPOrToolsSolver(Solver):
@@ -128,10 +134,11 @@ class VRPOrToolsSolver(Solver):
         if d_pickup >= INF or d_trip >= INF:
             return -INF
 
-        est_delivery_t = t + d_pickup + d_trip
+        # Fix: tính đúng thời điểm giao — move+pickup cùng timestep nên trừ 1
+        est_delivery_t = _est_delivery_t(t, d_pickup, d_trip)
         reward = delivery_reward(order, est_delivery_t, T)
         if reward <= 0:
-            return -INF  # giao cũng không có lãi
+            return -INF
 
         # Bonus: cùng điểm giao với đơn đang mang → giao được 1 lượt
         cluster_bonus = _W_CLUSTER * sum(
@@ -245,9 +252,27 @@ class VRPOrToolsSolver(Solver):
             if oid not in orders:
                 continue
             d = self._distance(shipper.position, (orders[oid].ex, orders[oid].ey))
-            if d < INF and t + d >= orders[oid].et - _URGENT_SLACK:
+            # Fix: dùng max(d-1,0) cho đúng với env (move+deliver cùng bước)
+            if d < INF and t + max(d - 1, 0) >= orders[oid].et - _URGENT_SLACK:
                 return True
         return False
+
+    def _is_endgame(self, t: int, T: int) -> bool:
+        """True nếu đang ở giai đoạn cuối episode."""
+        return T - t <= max(10, int(T * _ENDGAME_FRAC))
+
+    def _idle_reposition(self, shipper: Shipper, orders: Dict[int, Order]) -> Action:
+        """Di chuyển về centroid các đơn chưa nhặt khi rảnh."""
+        pending = [o for o in orders.values() if not o.picked and not o.delivered]
+        if not pending:
+            return ("S", 0)
+        cr = round(sum(o.sx for o in pending) / len(pending))
+        cc = round(sum(o.sy for o in pending) / len(pending))
+        goal: Position = (cr, cc)
+        if goal == shipper.position:
+            return ("S", 0)
+        mv = self._next_move(shipper.position, goal)
+        return (mv, 0) if mv != "S" else ("S", 0)
 
     # ------------------------------------------------------------------
     # Quyết định action từng shipper
@@ -288,17 +313,37 @@ class VRPOrToolsSolver(Solver):
                 nxt  = valid_next_pos(pos, mv, self.grid)
                 return (mv, 2) if nxt == goal else (mv, 0)
 
-        # 4. Có đơn được phân công → đi nhặt
+        # 4. Endgame: gần cuối T → giao hết hàng đang mang, không nhặt thêm
+        if self._is_endgame(t, T) and shipper.bag:
+            target = self._best_delivery_target(shipper, orders, t, T)
+            if target:
+                goal = (target.ex, target.ey)
+                mv   = self._next_move(pos, goal)
+                nxt  = valid_next_pos(pos, mv, self.grid)
+                return (mv, 2) if nxt == goal else (mv, 0)
+
+        # 5. Có đơn được phân công → so sánh với delivery trước khi quyết
         assigned_oid = assignment.get(shipper.id)
         if assigned_oid is not None:
             order = orders.get(assigned_oid)
             if order and not order.picked and not order.delivered:
+                pickup_score = self._pickup_score(shipper, order, orders, t, T)
+                # Nếu bag có hàng và delivery score tốt hơn rõ rệt thì giao trước
+                if shipper.bag:
+                    target = self._best_delivery_target(shipper, orders, t, T)
+                    if target:
+                        d_score = self._delivery_score(shipper, target, t, T)
+                        if d_score > pickup_score + 5.0:
+                            goal = (target.ex, target.ey)
+                            mv   = self._next_move(pos, goal)
+                            nxt  = valid_next_pos(pos, mv, self.grid)
+                            return (mv, 2) if nxt == goal else (mv, 0)
                 goal = (order.sx, order.sy)
                 mv   = self._next_move(pos, goal)
                 nxt  = valid_next_pos(pos, mv, self.grid)
                 return (mv, 1) if nxt == goal else (mv, 0)
 
-        # 5. Còn đơn trong túi → đi giao
+        # 6. Còn đơn trong túi → đi giao
         if shipper.bag:
             target = self._best_delivery_target(shipper, orders, t, T)
             if target:
@@ -307,27 +352,30 @@ class VRPOrToolsSolver(Solver):
                 nxt  = valid_next_pos(pos, mv, self.grid)
                 return (mv, 2) if nxt == goal else (mv, 0)
 
-        # 6. Rảnh → tìm đơn chưa ai nhận
-        best_order, best_score = None, -INF
-        for order in orders.values():
-            if order.picked or order.delivered or order.id in all_assigned_oids:
-                continue
-            score = self._pickup_score(shipper, order, orders, t, T)
-            if score > best_score:
-                best_score = score
-                best_order = order
+        # 7. Rảnh + không endgame → tìm đơn chưa ai nhận
+        if not self._is_endgame(t, T):
+            best_order, best_score = None, -INF
+            for order in orders.values():
+                if order.picked or order.delivered or order.id in all_assigned_oids:
+                    continue
+                score = self._pickup_score(shipper, order, orders, t, T)
+                if score > best_score:
+                    best_score = score
+                    best_order = order
 
-        if best_order is not None:
-            goal = (best_order.sx, best_order.sy)
-            mv   = self._next_move(pos, goal)
-            nxt  = valid_next_pos(pos, mv, self.grid)
-            return (mv, 1) if nxt == goal else (mv, 0)
+            if best_order is not None:
+                goal = (best_order.sx, best_order.sy)
+                mv   = self._next_move(pos, goal)
+                nxt  = valid_next_pos(pos, mv, self.grid)
+                return (mv, 1) if nxt == goal else (mv, 0)
 
-        return ("S", 0)
+        # 8. Hoàn toàn rảnh → reposition về vùng có đơn
+        return self._idle_reposition(shipper, orders)
 
     # ------------------------------------------------------------------
     # Giải quyết va chạm + phá deadlock
     # ------------------------------------------------------------------
+
 
     def _resolve(
         self,
