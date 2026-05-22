@@ -1,0 +1,116 @@
+# =============================================================
+# smoke_suite_config.txt — diverse local smoke tests only
+#
+# Includes:
+#   - FIXED_*: explicit generation params for deterministic edge cases.
+#   - RAND_*: hidden env generation params resolved from base_seed+name.
+#
+# Keep this light. Full Phase 1/full-map runs belong on Kaggle.
+# =============================================================
+
+[SEED]
+base_seed = 20260521
+
+[CONFIG]
+name    = FIXED_TINY
+N       = 7
+C       = 2
+G       = 6
+T       = 40
+K_max   = 3 2
+W_max   = 20.0 30.0
+surge_windows = 8 16
+hotspots      = 3 3
+surge_amplitude = 1.0
+[MAP]
+1 1 1 1 1 1 1
+1 0 0 0 0 0 1
+1 0 1 0 1 0 1
+1 0 0 0 0 0 1
+1 0 1 0 1 0 1
+1 0 0 0 0 0 1
+1 1 1 1 1 1 1
+[END]
+
+[CONFIG]
+name    = FIXED_BOTTLENECK
+N       = 9
+C       = 3
+G       = 12
+T       = 75
+K_max   = 3 2 3
+W_max   = 20.0 30.0 20.0
+surge_windows = 18 32
+hotspots      = 4 4
+surge_amplitude = 1.5
+[MAP]
+1 1 1 1 1 1 1 1 1
+1 0 0 0 0 0 0 0 1
+1 0 1 1 1 0 1 0 1
+1 0 0 0 1 0 1 0 1
+1 1 1 0 0 0 1 0 1
+1 0 0 0 1 0 0 0 1
+1 0 1 0 1 1 1 0 1
+1 0 0 0 0 0 0 0 1
+1 1 1 1 1 1 1 1 1
+[END]
+
+[CONFIG]
+name    = RAND_OPEN_SMALL
+N       = 8
+C       = 2
+G       = 10
+T       = 65
+K_max   = 3 3
+W_max   = 20.0 30.0
+[MAP]
+1 1 1 1 1 1 1 1
+1 0 0 0 0 0 0 1
+1 0 0 0 0 0 0 1
+1 0 0 0 0 0 0 1
+1 0 0 0 0 0 0 1
+1 0 0 0 0 0 0 1
+1 0 0 0 0 0 0 1
+1 1 1 1 1 1 1 1
+[END]
+
+[CONFIG]
+name    = RAND_MAZE_MEDIUM
+N       = 10
+C       = 3
+G       = 14
+T       = 90
+K_max   = 3 2 3
+W_max   = 20.0 30.0 20.0
+[MAP]
+1 1 1 1 1 1 1 1 1 1
+1 0 0 0 1 0 0 0 0 1
+1 0 1 0 1 0 1 1 0 1
+1 0 1 0 0 0 0 1 0 1
+1 0 1 1 1 1 0 1 0 1
+1 0 0 0 0 1 0 0 0 1
+1 1 1 1 0 1 1 1 0 1
+1 0 0 0 0 0 0 1 0 1
+1 0 1 1 1 1 0 0 0 1
+1 1 1 1 1 1 1 1 1 1
+[END]
+
+[CONFIG]
+name    = RAND_CAPACITY_STRESS
+N       = 9
+C       = 3
+G       = 16
+T       = 95
+K_max   = 1 2 3
+W_max   = 10.0 20.0 30.0
+[MAP]
+1 1 1 1 1 1 1 1 1
+1 0 0 0 0 0 0 0 1
+1 0 1 0 1 0 1 0 1
+1 0 0 0 1 0 0 0 1
+1 0 1 0 0 0 1 0 1
+1 0 0 0 1 0 0 0 1
+1 0 1 0 1 0 1 0 1
+1 0 0 0 0 0 0 0 1
+1 1 1 1 1 1 1 1 1
+[END]

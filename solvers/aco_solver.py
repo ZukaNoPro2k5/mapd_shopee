@@ -11,4 +11,4 @@ class ACOSolver(Solver):
 
     def run(self) -> dict:
         # TODO: xây dựng pheromone/heuristic trên đồ thị, mô phỏng và trả về dict kết quả.
-        return default_result("ACO", self.cfg, self.orders)
+        return default_result("ACO", self.env.config_name, self.env.G, self.orders)
