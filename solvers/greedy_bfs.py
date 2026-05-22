@@ -876,7 +876,7 @@ class GreedyBFS(Solver):
                 or self._has_urgent_carried_order(shipper, orders, t)
                 or (shipper.bag and self._endgame_started(t, horizon))
             )
-            if must_deliver:
+            if must_deliver and delivery_candidate is not None:
                 delivery_order, _ = delivery_candidate
                 self._target_by_shipper[shipper.id] = ("delivery", delivery_order.id)
                 actions[shipper.id] = self._delivery_action(shipper, delivery_order)
