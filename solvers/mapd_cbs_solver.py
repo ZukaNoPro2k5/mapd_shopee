@@ -30,8 +30,6 @@ DISTANCE_PENALTY = 0.02   # Closer to true move cost (0.01 * w)
 LATE_PENALTY = 0.01       # Tiny penalty just for tie-breaking; rely on env's beta modifier
 PRIORITY_BONUS = 5.0
 SAME_DESTINATION_BONUS = 3.0
-EXACT_DESTINATION_MATCH_BONUS = 2.0
-SUPER_BATCH_BONUS = 3.0
 URGENCY_BONUS = 0.1
 
 # Stickiness / clustering / detour / endgame
@@ -207,27 +205,6 @@ class MAPDCBSSolver(Solver):
             elif d <= 1:
                 near += 1
         return VISIBLE_DESTINATION_BONUS * same + 0.5 * VISIBLE_DESTINATION_BONUS * near
-
-    def _exact_destination_match_bonus(self, target_order: Order, orders: Dict[int, Order]) -> float:
-        count = sum(
-            1 for order in orders.values()
-            if order.id != target_order.id
-            and not order.picked
-            and not order.delivered
-            and (order.ex, order.ey) == (target_order.ex, target_order.ey)
-        )
-        return count * EXACT_DESTINATION_MATCH_BONUS
-
-    def _super_batch_bonus(self, target_order: Order, orders: Dict[int, Order]) -> float:
-        count = sum(
-            1 for order in orders.values()
-            if order.id != target_order.id
-            and not order.picked
-            and not order.delivered
-            and (order.sx, order.sy) == (target_order.sx, target_order.sy)
-            and (order.ex, order.ey) == (target_order.ex, target_order.ey)
-        )
-        return count * SUPER_BATCH_BONUS
 
     def _insertion_detour(
         self, shipper: Shipper, order: Order, orders: Dict[int, Order],
@@ -519,8 +496,6 @@ class MAPDCBSSolver(Solver):
             + SAME_DESTINATION_BONUS * same_destination
             + self._visible_pickup_cluster_bonus(order, orders)
             + self._visible_destination_cluster_bonus(order, orders)
-            + self._exact_destination_match_bonus(order, orders)
-            + self._super_batch_bonus(order, orders)
             - DISTANCE_PENALTY * to_pickup
             - PICKUP_WAIT_PENALTY * max(0, t - order.appear_t)
             - self._slot_pressure_penalty(
@@ -552,29 +527,40 @@ class MAPDCBSSolver(Solver):
         lateness = max(0, delivery_t - order.et)
         same_destination = self._same_destination_count(shipper, destination, orders)
 
+        detour = 0
+        route_delta = 0.0
         carried = self._carried_orders(shipper, orders)
         if carried:
-            return self._insertion_pickup_score(
-                shipper,
-                order,
-                carried,
-                orders,
-                t,
-                horizon,
-                to_pickup,
-                trip,
-            )
+            detour = self._insertion_detour(shipper, order, orders)
+            if detour >= INF:
+                return NEG_INF
+            if ROUTE_DELTA_WEIGHT:
+                current_route = self._route_score(
+                    carried,
+                    shipper.position,
+                    t,
+                    horizon,
+                )
+                pickup_t = t + max(to_pickup - 1, 0)
+                new_route = self._route_score(
+                    carried + [order],
+                    pickup,
+                    pickup_t,
+                    horizon,
+                    after_pickup=True,
+                )
+                route_delta = new_route - current_route
 
         return (
             reward
+            + ROUTE_DELTA_WEIGHT * route_delta
             + PRIORITY_BONUS * order.p
             + self._stickiness_bonus(shipper, "pickup", order)
             + SAME_DESTINATION_BONUS * same_destination
             + self._visible_pickup_cluster_bonus(order, orders)
             + self._visible_destination_cluster_bonus(order, orders)
-            + self._exact_destination_match_bonus(order, orders)
-            + self._super_batch_bonus(order, orders)
             - DISTANCE_PENALTY * (to_pickup + trip)
+            - INSERTION_DETOUR_PENALTY * detour
             - LATE_PENALTY * lateness
             - PICKUP_WAIT_PENALTY * max(0, t - order.appear_t)
         )
@@ -934,12 +920,7 @@ class MAPDCBSSolver(Solver):
             if targets[shipper.id] is None and best_delivery.get(shipper.id) is not None:
                 targets[shipper.id] = best_delivery[shipper.id]
 
-        self._assignment_candidates = self._build_assignment_candidates(
-            targets,
-            forced_targets,
-            available_shippers,
-            score_matrix,
-        )
+        self._assignment_candidates = []
 
         # Update stickiness tracking
         self._commit_target_history(targets)
@@ -1788,14 +1769,7 @@ class MAPDCBSSolver(Solver):
         horizon = int(obs["T"])
         targets = self._assign_targets_global(shippers, orders, t, horizon)
 
-        targets, paths = self._select_path_aware_assignment(
-            shippers,
-            targets,
-            orders,
-            t,
-            horizon,
-        )
-        self._commit_selected_pickups(shippers, targets)
+        paths = self._plan_paths(shippers, targets, orders, t)
         self._last_selected_targets = dict(targets)
         actions = {
             shipper.id: self._action_for_path(
