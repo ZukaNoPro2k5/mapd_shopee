@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from typing import Dict, List, Optional, Set, Tuple
 
 from env import (
@@ -20,13 +20,16 @@ _MOVE_DELTAS: Dict[str, Tuple[int, int]] = {
     "U": (-1, 0), "D": (1, 0), "L": (0, -1), "R": (0, 1),
 }
 _MOVES = tuple(_MOVE_DELTAS.keys())
+_OPPOSITE: Dict[str, str] = {"U": "D", "D": "U", "L": "R", "R": "L", "S": "S"}
 
 # Scoring weights
 _W_DIST    = 0.10   # penalty mỗi bước khoảng cách
 _W_PRIO    = 5.0    # bonus theo priority
-_W_CLUSTER = 6.0    # bonus nếu cùng điểm giao với đơn đang mang
-_URGENT_SLACK = 5   # bước còn trước deadline → coi là urgent
-_ENDGAME_FRAC = 0.15  # phần cuối T → ưu tiên giao hàng
+_W_CLUSTER = 10.0   # bonus nếu cùng điểm giao với đơn đang mang (sweet spot local)
+_URGENT_SLACK = 8   # bước còn trước deadline → coi là urgent (bump để giảm late)
+_URGENCY_WEIGHT = 30.0  # bonus urgency trong delivery_score
+_ENDGAME_FRAC = 0.10  # phần cuối T → ưu tiên giao hàng
+_BFS_CACHE_CAP = 256  # số cell-gốc tối đa cache BFS toàn cây
 
 
 def _est_delivery_t(t: int, d_to_pickup: int, d_trip: int) -> int:
@@ -49,66 +52,73 @@ class VRPOrToolsSolver(Solver):
 
     def __init__(self, env: DeliveryEnv):
         super().__init__(env)
-        self._dist_cache: Dict[Tuple[Position, Position], int] = {}
-        self._move_cache: Dict[Tuple[Position, Position], Move] = {}
+        # BFS cache theo START cell — preserve exact behavior của old per-pair BFS:
+        # cùng neighbor expansion order, cùng first_move trên đường đi.
+        # Mỗi lần BFS từ start sinh ra toàn bộ cây shortest-path; mọi câu hỏi
+        # _distance(start, goal_i) cho nhiều goal_i đều free.
+        self._bfs_cache: "OrderedDict[Position, Tuple[Dict[Position, int], Dict[Position, Move]]]" = OrderedDict()
 
     # ------------------------------------------------------------------
-    # BFS — tự viết, không import từ greedy_bfs
+    # BFS rooted at start — tự viết, không import từ greedy_bfs
     # ------------------------------------------------------------------
 
-    def _bfs(self, start: Position, goal: Position) -> Tuple[int, Move]:
-        """
-        Tìm đường ngắn nhất trên lưới (BFS).
-        Trả (khoảng_cách, bước_đầu_tiên_từ_start). INF nếu không đi được.
-        """
-        if start == goal:
-            return 0, "S"
-        if not is_valid_cell(start, self.grid) or not is_valid_cell(goal, self.grid):
-            return INF, "S"
+    def _bfs_from(self, start: Position) -> Tuple[Dict[Position, int], Dict[Position, Move]]:
+        """BFS rooted at `start`; trả (dist tới mọi cell, first_move từ start đến mỗi cell)."""
+        cached = self._bfs_cache.get(start)
+        if cached is not None:
+            self._bfs_cache.move_to_end(start)
+            return cached
+        if not is_valid_cell(start, self.grid):
+            empty: Tuple[Dict[Position, int], Dict[Position, Move]] = ({}, {})
+            self._bfs_cache[start] = empty
+            self._evict_bfs_cache()
+            return empty
 
+        dist: Dict[Position, int] = {start: 0}
+        first_move: Dict[Position, Move] = {start: "S"}
         queue: deque[Position] = deque([start])
-        # parent[node] = (node_trước_đó, hướng_đi_để_đến_node)
-        parent: Dict[Position, Tuple[Position, Move]] = {}
-
+        grid = self.grid
+        n_rows = len(grid)
+        n_cols = len(grid[0]) if n_rows else 0
         while queue:
             cur = queue.popleft()
+            d_next = dist[cur] + 1
+            cur_first = first_move[cur]
+            cr, cc = cur
             for mv, (dr, dc) in _MOVE_DELTAS.items():
-                nxt = (cur[0] + dr, cur[1] + dc)
-                if nxt == start or nxt in parent or not is_valid_cell(nxt, self.grid):
+                nr, nc = cr + dr, cc + dc
+                if nr < 0 or nr >= n_rows or nc < 0 or nc >= n_cols:
                     continue
-                parent[nxt] = (cur, mv)
-                if nxt == goal:
-                    # Trace ngược từ goal để lấy bước đầu tiên và khoảng cách
-                    dist, node, first_move = 0, goal, mv
-                    while node != start:
-                        prev, m = parent[node]
-                        first_move = m
-                        dist += 1
-                        node = prev
-                    return dist, first_move
+                if grid[nr][nc] != 0:
+                    continue
+                nxt = (nr, nc)
+                if nxt in dist:
+                    continue
+                dist[nxt] = d_next
+                # Propagate first move: nếu cur == start thì first move là mv,
+                # ngược lại kế thừa từ cur. Khớp đúng tie-breaking BFS từ start.
+                first_move[nxt] = mv if cur == start else cur_first
                 queue.append(nxt)
 
-        return INF, "S"
+        self._bfs_cache[start] = (dist, first_move)
+        self._evict_bfs_cache()
+        return self._bfs_cache[start]
+
+    def _evict_bfs_cache(self) -> None:
+        while len(self._bfs_cache) > _BFS_CACHE_CAP:
+            self._bfs_cache.popitem(last=False)
 
     def _distance(self, a: Position, b: Position) -> int:
         if a == b:
             return 0
-        key = (a, b)
-        if key not in self._dist_cache:
-            d, mv = self._bfs(a, b)
-            self._dist_cache[key] = d
-            self._move_cache[key] = mv
-        return self._dist_cache[key]
+        dist, _ = self._bfs_from(a)
+        return dist.get(b, INF)
 
     def _next_move(self, a: Position, b: Position) -> Move:
         if a == b:
             return "S"
-        key = (a, b)
-        if key not in self._move_cache:
-            d, mv = self._bfs(a, b)
-            self._dist_cache[key] = d
-            self._move_cache[key] = mv
-        return self._move_cache[key]
+        _, first_move = self._bfs_from(a)
+        return first_move.get(b, "S")
 
     # ------------------------------------------------------------------
     # Tính điểm
@@ -168,7 +178,7 @@ class VRPOrToolsSolver(Solver):
         reward  = delivery_reward(order, est_t, T)
         # Ưu tiên đơn deadline gần (urgency score)
         urgency = max(1, order.et - t)
-        return reward + _W_PRIO * order.p - _W_DIST * d + 10.0 / urgency
+        return reward + _W_PRIO * order.p - _W_DIST * d + _URGENCY_WEIGHT / urgency
 
     # ------------------------------------------------------------------
     # Global assignment (stateless — reset mỗi bước)
@@ -402,13 +412,11 @@ class VRPOrToolsSolver(Solver):
             occupied.discard(old)
 
             if tgt in occupied:
-                # Bị chặn: thử ô bên cạnh (tránh deadlock)
-                # Ưu tiên: ô không bị chiếm, không phải ô hiện tại của shipper khác
                 alt_found = False
                 for mv, (dr, dc) in _MOVE_DELTAS.items():
                     alt = (old[0] + dr, old[1] + dc)
                     if is_valid_cell(alt, self.grid) and alt not in occupied:
-                        resolved[sid] = (mv, 0)  # di chuyển, không làm cargo_op
+                        resolved[sid] = (mv, 0)
                         tgt = alt
                         alt_found = True
                         break
