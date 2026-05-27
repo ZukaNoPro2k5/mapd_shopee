@@ -44,7 +44,7 @@ class MAPDCBSSolver(Solver):
         if start in self._distance_maps:
             return self._distance_maps[start]
 
-        if len(self._distance_maps) > 300:
+        if len(self._distance_maps) > 2000:
             # FIFO eviction to prevent OOM
             first_key = next(iter(self._distance_maps))
             del self._distance_maps[first_key]
@@ -113,7 +113,7 @@ class MAPDCBSSolver(Solver):
                 if dist == INF:
                     valid = False
                     break
-                
+
                 curr_t = curr_t + max(0, dist - 1)
                 for o in bag_groups[dest]:
                     total_reward += delivery_reward(o, curr_t, self.env.T)
@@ -162,7 +162,7 @@ class MAPDCBSSolver(Solver):
                     true_dist = dist_map.get((o.sx, o.sy), INF)
                     if true_dist != INF:
                         promising_orders.append((true_dist - o.p * 15, o, true_dist))
-                
+
                 promising_orders.sort(key=lambda x: x[0])
                 for _, o, dist_to_pickup in promising_orders[:30]:
 
@@ -242,7 +242,7 @@ class MAPDCBSSolver(Solver):
                     is_endgame = (remaining_visible <= max(len(shippers) * 2, 10)) or (t > T * 0.8)
                     if is_endgame and marginal > 0:
                         threshold = -INF
-                        
+
                     if score > threshold:
                         pickup_candidates.append((score, s.id, o))
 
@@ -275,10 +275,10 @@ class MAPDCBSSolver(Solver):
                     # Cuts wait time from ~24 ticks to ~12 ticks (see analysis)
                     carried = [orders[oid] for oid in s.bag if oid in orders and not orders[oid].delivered]
                     carried_weight = sum(o.w for o in carried)
-                    
+
                     best_idle_target = None
                     best_idle_score = -INF
-                    
+
                     for o in visible_orders:
                         if o.id in assigned_orders:
                             continue
@@ -293,7 +293,7 @@ class MAPDCBSSolver(Solver):
                         if idle_score > best_idle_score:
                             best_idle_score = idle_score
                             best_idle_target = (o.sx, o.sy)
-                    
+
                     if best_idle_target is not None:
                         self._targets[s.id] = ('idle', best_idle_target)
                     else:
@@ -314,7 +314,7 @@ class MAPDCBSSolver(Solver):
 
     def _get_action(self, s: Shipper, target: Tuple[str, Any], orders: Dict[int, Order], t: int) -> Action:
         carried = [orders[oid] for oid in s.bag if oid in orders and not orders[oid].delivered]
-        
+
         if any((o.ex, o.ey) == s.position for o in carried):
             return ("S", 2)
 
@@ -336,7 +336,7 @@ class MAPDCBSSolver(Solver):
 
         # Basic pathing
         move = self._next_move(s.position, goal)
-        
+
         # Deadlock breaking: if stuck for > 1 ticks, pick a random valid move
         if self._stuck_ticks.get(s.id, 0) > 1:
             valid_m = []
@@ -384,7 +384,7 @@ class MAPDCBSSolver(Solver):
                     b_target = self._targets.get(blocker.id, ('idle', None))
                     is_idle = not blocker.bag and b_target[0] == 'idle'
                     is_lower_prio = self._shipper_importance(s, orders) > self._shipper_importance(blocker, orders)
-                    
+
                     if is_idle or is_lower_prio:
                         forbidden = set(desired_pos.values())
                         forbidden.add(s.position)
