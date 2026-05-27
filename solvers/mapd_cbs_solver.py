@@ -44,6 +44,12 @@ class MAPDCBSSolver(Solver):
         if start in self._distance_maps:
             return self._distance_maps[start]
 
+        if len(self._distance_maps) > 300:
+            # FIFO eviction to prevent OOM
+            first_key = next(iter(self._distance_maps))
+            del self._distance_maps[first_key]
+            del self._parent_maps[first_key]
+
         distances = {start: 0}
         parents: Dict[Position, Tuple[Optional[Position], Move]] = {start: (None, "S")}
         queue: deque[Position] = deque([start])
@@ -125,6 +131,7 @@ class MAPDCBSSolver(Solver):
         orders: Dict[int, Order] = obs["orders"]
         t = int(obs["t"])
         T = int(obs["T"])
+        N = len(self.grid)
 
         visible_orders = [o for o in orders.values() if not o.picked and not o.delivered]
         base_rewards = {}
@@ -147,64 +154,94 @@ class MAPDCBSSolver(Solver):
 
             if len(carried) < s.K_max:
                 promising_orders = []
-                # Use exact BFS distance map from current position to handle complex mazes
                 dist_map = self._distance_map_from(s.position)
                 for o in visible_orders:
-                    if carried_weight + o.w <= s.W_max:
-                        true_dist = dist_map.get((o.sx, o.sy), INF)
-                        if true_dist != INF:
-                            promising_orders.append((true_dist - o.p * 15, o, true_dist))
+                    # Hard filter: weight must fit
+                    if carried_weight + o.w > s.W_max:
+                        continue
+                    true_dist = dist_map.get((o.sx, o.sy), INF)
+                    if true_dist != INF:
+                        promising_orders.append((true_dist - o.p * 15, o, true_dist))
                 
-                # Only evaluate the top 30 most promising orders
                 promising_orders.sort(key=lambda x: x[0])
                 for _, o, dist_to_pickup in promising_orders[:30]:
 
                     pickup_t = t + max(1, dist_to_pickup)
                     new_r, _ = self._evaluate_route((o.sx, o.sy), pickup_t, carried + [o])
 
-                    # 1. Marginal Reward: Độ chênh lệch điểm số thực tế khi thêm đơn này vào lộ trình.
-                    # Hàm _evaluate_route đã giải bài toán TSP cực tiểu hóa độ trễ, nên marginal này 
-                    # bao gồm cả penalty nếu việc nhặt đơn mới làm trễ các đơn đang có trong túi.
+                    # 1. Marginal Reward
                     marginal = new_r - base_rewards[s.id]
-                    
-                    # 2. Capitalist Penalties (Không kích hoạt trực tiếp trong score nhưng có thể dùng để scale)
-                    opp_cost = (o.w / s.W_max) * 4.0
-                    trash_penalty = 0.0
-                    if carried:
-                        if o.p == 1: trash_penalty = 12.0 # Heavily penalize detouring for cheap orders
-                        elif o.p == 2: trash_penalty = 5.0
 
-                    # 3. Cluster Bonus: Khuyến khích Batching (gom đơn) cho Shipper rỗng.
-                    # Bằng cách quét các đơn 'visible_orders' khác, ta tăng mạnh điểm số nếu đơn o
-                    # có cùng đích đến (hoặc điểm lấy) với một đơn khác.
-                    # Các hệ số 10.0 và 30.0 được tìm ra qua Grid Search, giúp Shipper rỗng nhận ra 
-                    # tiềm năng giao 1 chuyến được nhiều đơn, từ đó tự động tối ưu hóa băng thông.
-                    cluster_bonus = 0.0
-                    for other in visible_orders:
-                        if other.id != o.id:
-                            d_pickup = abs(o.sx - other.sx) + abs(o.sy - other.sy)
-                            if d_pickup == 0: cluster_bonus += 10.0 * other.p
-                            elif d_pickup <= 2: cluster_bonus += 1.0 * other.p
-                            
-                            d_drop = abs(o.ex - other.ex) + abs(o.ey - other.ey)
-                            if d_drop == 0: cluster_bonus += 30.0 * other.p
-                            elif d_drop <= 2: cluster_bonus += 2.0 * other.p
-                            
-                    # 4. Stickiness: Chống Lắc Lư (Oscillation Avoidance).
-                    # Giữ Shipper trung thành với mục tiêu hiện tại (5.0 điểm) để tránh đổi target liên tục
-                    # khi các đơn hàng mới liên tiếp xuất hiện trên map.
-                    stickiness = 5.0 if self._targets.get(s.id) == ('pickup', o.id) else 0.0
-                    
-                    # 5. Distance Penalty: Chi phí cơ hội (Opportunity Cost of Time).
-                    # Không chia cho kích thước map (N) vì chi phí của việc đi 1 bước là mất 1 tick thời gian.
-                    # Hệ số 1.2 đảm bảo shipper ưu tiên đơn gần nếu các phần thưởng xấp xỉ nhau, 
-                    # nhưng vẫn sẵn sàng đi xa nếu đơn đó mang lại Reward vượt trội (p=3).
-                    dist_penalty = dist_to_pickup * 1.2
+                    # For EMPTY shippers: any feasible order with positive marginal is worth taking.
+                    # Distance cost is negligible vs. reward, so no dist_penalty or opp_cost.
+                    # Just use priority + cluster bonus to rank candidates.
+                    if not carried:
+                        # 3. Cluster Bonus
+                        cluster_bonus = 0.0
+                        for other in visible_orders:
+                            if other.id != o.id:
+                                d_drop = abs(o.ex - other.ex) + abs(o.ey - other.ey)
+                                if d_drop == 0: cluster_bonus += 30.0 * other.p
+                                elif d_drop <= 2: cluster_bonus += 2.0 * other.p
+                        # 4. Stickiness
+                        stickiness = 5.0 if self._targets.get(s.id) == ('pickup', o.id) else 0.0
+                        # Mild dist penalty so we prefer nearby orders, but don't reject far ones
+                        normalized_dist = dist_to_pickup / max(N, 1)
+                        dist_penalty = normalized_dist * 15.0 * (1.0 / o.p)
+                        # Mild capacity opportunity cost to prefer lighter items first
+                        opp_cost = (o.w / max(s.W_max, 1.0)) * 2.0
 
-                    # Tổng hợp điểm
-                    score = marginal + cluster_bonus + stickiness - dist_penalty
+                        score = marginal + cluster_bonus + stickiness - dist_penalty - opp_cost
+                        threshold = -20.0  # Empty: allow mild negative (far orders still worth taking)
+                    else:
+                        # For LOADED shippers: be selective. Picking up adds risk of missing deadlines.
+                        # 2. Capacity Opportunity Cost (reduced from 4.0 — marginal already gates this)
+                        opp_cost = (o.w / max(s.W_max, 1.0)) * 2.0
+                        # Trash penalty: only penalize picking up low-priority when already carrying high
+                        max_carried_p = max(co.p for co in carried) if carried else 0
+                        trash_penalty = 0.0
+                        if o.p < max_carried_p:
+                            trash_penalty = (max_carried_p - o.p) * 3.0
 
-                    threshold = 0.0 if carried else -INF
+                        # 3. Cluster Bonus
+                        cluster_bonus = 0.0
+                        for other in visible_orders:
+                            if other.id != o.id:
+                                d_pickup = abs(o.sx - other.sx) + abs(o.sy - other.sy)
+                                if d_pickup == 0: cluster_bonus += 10.0 * other.p
+                                elif d_pickup <= 2: cluster_bonus += 1.0 * other.p
+                                d_drop = abs(o.ex - other.ex) + abs(o.ey - other.ey)
+                                if d_drop == 0: cluster_bonus += 30.0 * other.p
+                                elif d_drop <= 2: cluster_bonus += 2.0 * other.p
+
+                        # 4. Stickiness
+                        stickiness = 5.0 if self._targets.get(s.id) == ('pickup', o.id) else 0.0
+
+                        # 5. Detour Bonus (Pipeline Batching)
+                        # Encourage picking up orders that are on the way to the current delivery destination
+                        detour_bonus = 0.0
+                        dest = best_routes.get(s.id)
+                        if dest:
+                            d_curr_to_pickup = dist_to_pickup
+                            d_pickup_to_dest = abs(o.sx - dest[0]) + abs(o.sy - dest[1])
+                            d_curr_to_dest = self._distance(s.position, dest)
+                            if d_curr_to_dest != INF:
+                                detour = d_curr_to_pickup + d_pickup_to_dest - d_curr_to_dest
+                                if detour <= 2:
+                                    detour_bonus = 15.0 * o.p
+
+                        # 6. Distance Penalty — heavier for loaded shippers to protect existing cargo
+                        normalized_dist = dist_to_pickup / max(N, 1)
+                        dist_penalty = normalized_dist * 25.0 * (1.0 / o.p)
+
+                        score = marginal + cluster_bonus + stickiness + detour_bonus - trash_penalty - opp_cost - dist_penalty
+                        threshold = 0.0  # Loaded: must clearly add value
+
+                    # 6. Endgame mode: accept any positive-marginal order
+                    remaining_visible = len(visible_orders)
+                    is_endgame = (remaining_visible <= max(len(shippers) * 2, 10)) or (t > T * 0.8)
+                    if is_endgame and marginal > 0:
+                        threshold = -INF
                         
                     if score > threshold:
                         pickup_candidates.append((score, s.id, o))
@@ -234,21 +271,46 @@ class MAPDCBSSolver(Solver):
                 if best_routes[s.id] is not None:
                     self._targets[s.id] = ('deliver', best_routes[s.id])
                 else:
-                    best_hs = s.position
-                    best_hs_score = -INF
-                    for hs_pos, count in hotspots:
-                        if hs_pos not in assigned_hotspots:
-                            # Distance-weighted hotspot: High frequency is good, but far away is bad
-                            dist = self._distance(s.position, hs_pos)
-                            if dist == INF: continue
-                            score = count * 10 - dist
-                            if score > best_hs_score:
-                                best_hs_score = score
-                                best_hs = hs_pos
+                    # Dynamic idle targeting: go to nearest unassigned feasible order
+                    # Cuts wait time from ~24 ticks to ~12 ticks (see analysis)
+                    carried = [orders[oid] for oid in s.bag if oid in orders and not orders[oid].delivered]
+                    carried_weight = sum(o.w for o in carried)
                     
-                    if best_hs != s.position:
-                        assigned_hotspots.add(best_hs)
-                    self._targets[s.id] = ('idle', best_hs)
+                    best_idle_target = None
+                    best_idle_score = -INF
+                    
+                    for o in visible_orders:
+                        if o.id in assigned_orders:
+                            continue
+                        if carried_weight + o.w > s.W_max:
+                            continue
+                        dist = self._distance(s.position, (o.sx, o.sy))
+                        if dist == INF:
+                            continue
+                        # Score: nearby + high priority + urgent deadline
+                        urgency = max(0, o.et - t) / max(o.et, 1)
+                        idle_score = o.p * 10 - dist + urgency * 5
+                        if idle_score > best_idle_score:
+                            best_idle_score = idle_score
+                            best_idle_target = (o.sx, o.sy)
+                    
+                    if best_idle_target is not None:
+                        self._targets[s.id] = ('idle', best_idle_target)
+                    else:
+                        # Fallback: historical hotspot
+                        best_hs = s.position
+                        best_hs_score = -INF
+                        for hs_pos, count in hotspots:
+                            if hs_pos not in assigned_hotspots:
+                                dist = self._distance(s.position, hs_pos)
+                                if dist == INF: continue
+                                score = count * 10 - dist
+                                if score > best_hs_score:
+                                    best_hs_score = score
+                                    best_hs = hs_pos
+                        if best_hs != s.position:
+                            assigned_hotspots.add(best_hs)
+                        self._targets[s.id] = ('idle', best_hs)
 
     def _get_action(self, s: Shipper, target: Tuple[str, Any], orders: Dict[int, Order], t: int) -> Action:
         carried = [orders[oid] for oid in s.bag if oid in orders and not orders[oid].delivered]
@@ -300,7 +362,11 @@ class MAPDCBSSolver(Solver):
 
     def _shipper_importance(self, s: Shipper, orders: Dict[int, Order]) -> float:
         carried = [orders[oid] for oid in s.bag if oid in orders and not orders[oid].delivered]
-        if not carried: return 0.0
+        if not carried:
+            target = self._targets.get(s.id)
+            if target and target[0] == 'pickup' and target[1] in orders:
+                return orders[target[1]].p * 0.5
+            return 0.0
         return max(o.p for o in carried)
 
     def _resolve_conflicts(self, actions: Dict[int, Action], shippers: List[Shipper], orders: Dict[int, Order]) -> Dict[int, Action]:
@@ -309,14 +375,17 @@ class MAPDCBSSolver(Solver):
             move, op = actions[s.id]
             desired_pos[s.id] = valid_next_pos(s.position, move, self.grid)
 
-        # 1. Idle blockers yielding
+        # 1. Blockers yielding to higher priority or if they are idle
         for s in shippers:
             t_pos = desired_pos[s.id]
             if t_pos != s.position:
                 blocker = next((x for x in shippers if x.position == t_pos), None)
-                if blocker and blocker.id != s.id:
+                if blocker and blocker.id != s.id and desired_pos[blocker.id] == blocker.position:
                     b_target = self._targets.get(blocker.id, ('idle', None))
-                    if desired_pos[blocker.id] == blocker.position and not blocker.bag and b_target[0] == 'idle':
+                    is_idle = not blocker.bag and b_target[0] == 'idle'
+                    is_lower_prio = self._shipper_importance(s, orders) > self._shipper_importance(blocker, orders)
+                    
+                    if is_idle or is_lower_prio:
                         forbidden = set(desired_pos.values())
                         forbidden.add(s.position)
                         yield_move = None
