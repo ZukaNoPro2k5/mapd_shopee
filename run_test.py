@@ -33,6 +33,7 @@ SOLVER_SOURCES = [
     ("VRPOrToolsSolver", "vrp_ortools.py"),
     ("ACOSolver", "aco_solver.py"),
     ("MAPDCBSSolver", "mapd_cbs_solver.py"),
+    ("MAPDCBSSolverOld", "mapd_cbs_solver_old.py"),
 ]
 
 
@@ -115,12 +116,13 @@ def main():
         solver_classes = all_solver_classes
         print("Chạy tất cả phương pháp:", ", ".join(name for name, _ in solver_classes))
     else:
-        # Tìm phương pháp cụ thể
-        solver_classes = [(name, cls) for name, cls in all_solver_classes if name == args.method]
+        # Tìm các phương pháp được chỉ định (hỗ trợ phân cách bằng dấu phẩy)
+        requested_methods = [m.strip() for m in args.method.split(",")]
+        solver_classes = [(name, cls) for name, cls in all_solver_classes if name in requested_methods]
         if not solver_classes:
             available = [name for name, _ in all_solver_classes]
             sys.exit(f"[ERROR] Phương pháp '{args.method}' không tồn tại. Các phương pháp có sẵn: {', '.join(available)}")
-        print(f"Chạy phương pháp: {args.method}")
+        print(f"Chạy phương pháp: {', '.join(name for name, _ in solver_classes)}")
     
     print("Solver sẽ chạy:", ", ".join(name for name, _ in solver_classes), "\n")
 
