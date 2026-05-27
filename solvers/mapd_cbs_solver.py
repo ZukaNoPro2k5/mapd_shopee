@@ -147,6 +147,14 @@ class MAPDCBSSolver(Solver):
                 base_rewards[s.id] = 0.0
                 best_routes[s.id] = None
 
+        # Calculate map density to apply opportunity cost filtering
+        density = len(visible_orders) / max(len(shippers), 1)
+        profit_threshold = 0.0
+        if density > 10:
+            profit_threshold = 5.0
+        elif density > 5:
+            profit_threshold = 2.0
+
         pickup_candidates = []
         for s in shippers:
             carried = [orders[oid] for oid in s.bag if oid in orders and not orders[oid].delivered]
@@ -169,8 +177,20 @@ class MAPDCBSSolver(Solver):
                     pickup_t = t + max(1, dist_to_pickup)
                     new_r, _ = self._evaluate_route((o.sx, o.sy), pickup_t, carried + [o])
 
-                    # 1. Marginal Reward
+                    # 1. Marginal Reward & Pure Profit
                     marginal = new_r - base_rewards[s.id]
+                    
+                    trip_dist = self._distance((o.sx, o.sy), (o.ex, o.ey))
+                    trip_dist = trip_dist if trip_dist != INF else (abs(o.sx - o.ex) + abs(o.sy - o.ey))
+                    cost_empty = dist_to_pickup * 0.01
+                    cost_loaded = trip_dist * 0.01 * (1 + o.w / max(s.W_max, 1.0))
+                    expected_move_cost = cost_empty + cost_loaded
+                    
+                    pure_profit = marginal - expected_move_cost
+                    
+                    # Reject unprofitable orders entirely if map is dense
+                    if pure_profit <= profit_threshold:
+                        continue
 
                     # For EMPTY shippers: any feasible order with positive marginal is worth taking.
                     # Distance cost is negligible vs. reward, so no dist_penalty or opp_cost.
@@ -191,8 +211,8 @@ class MAPDCBSSolver(Solver):
                         # Mild capacity opportunity cost to prefer lighter items first
                         opp_cost = (o.w / max(s.W_max, 1.0)) * 2.0
 
-                        score = marginal + cluster_bonus + stickiness - dist_penalty - opp_cost
-                        threshold = -20.0  # Empty: allow mild negative (far orders still worth taking)
+                        score = pure_profit + cluster_bonus + stickiness - dist_penalty - opp_cost
+                        threshold = -INF  # Empty: allow anything that passed pure_profit filter
                     else:
                         # For LOADED shippers: be selective. Picking up adds risk of missing deadlines.
                         # 2. Capacity Opportunity Cost (reduced from 4.0 — marginal already gates this)
@@ -234,7 +254,7 @@ class MAPDCBSSolver(Solver):
                         normalized_dist = dist_to_pickup / max(N, 1)
                         dist_penalty = normalized_dist * 25.0 * (1.0 / o.p)
 
-                        score = marginal + cluster_bonus + stickiness + detour_bonus - trash_penalty - opp_cost - dist_penalty
+                        score = pure_profit + cluster_bonus + stickiness + detour_bonus - trash_penalty - opp_cost - dist_penalty
                         threshold = 0.0  # Loaded: must clearly add value
 
                     # 6. Endgame mode: accept any positive-marginal order
