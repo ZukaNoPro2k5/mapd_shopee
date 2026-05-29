@@ -23,8 +23,8 @@ from solvers.solver import Solver
 ALPHA = 0.8
 BETA = 3  # trong so heuristic (eta)
 RHO = 0.08  # toc do bay hoi pheromone
-N_ANTS = 50  # số kiến mỗi iteration (sweet spot)
-N_ITER = 25  # số iteration ACO (sweet spot)
+N_ANTS = 40  # số kiến mỗi iteration (sweet spot)
+N_ITER = 15  # số iteration ACO (sweet spot)
 TAU_MIN = 0.1
 TAU_MAX = 25.0
 
@@ -843,14 +843,14 @@ class ACOSolver(Solver):
             self.prev_pending = num_pending
 
             # ====================== LOG ======================
-            # if t % 25 == 0 or run_global or len(just_delivered) > 0:
-            #     status = "ON" if run_global else "off"
-            #     print(
-            #         f"t={t:4d} | Reward={self.total_reward:8.1f} | "
-            #         f"Delivered={total_delivered_count:3d}/{total_orders} ({delivery_rate:5.1f}%) | "
-            #         f"OnTime={on_time_rate:5.1f}% | Pending={num_pending:3d} | "
-            #         f"Interval={self.current_interval} | Global={status}"
-            #     )
+            if t % 25 == 0 or run_global or len(just_delivered) > 0:
+                status = "ON" if run_global else "off"
+                print(
+                    f"t={t:4d} | Reward={self.total_reward:8.1f} | "
+                    f"Delivered={total_delivered_count:3d}/{total_orders} ({delivery_rate:5.1f}%) | "
+                    f"OnTime={on_time_rate:5.1f}% | Pending={num_pending:3d} | "
+                    f"Interval={self.current_interval} | Global={status}"
+                )
 
             if done:
                 break
