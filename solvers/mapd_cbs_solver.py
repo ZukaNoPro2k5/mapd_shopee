@@ -179,15 +179,15 @@ class MAPDCBSSolver(Solver):
 
                     # 1. Marginal Reward & Pure Profit
                     marginal = new_r - base_rewards[s.id]
-                    
+
                     trip_dist = self._distance((o.sx, o.sy), (o.ex, o.ey))
                     trip_dist = trip_dist if trip_dist != INF else (abs(o.sx - o.ex) + abs(o.sy - o.ey))
                     cost_empty = dist_to_pickup * 0.01
                     cost_loaded = trip_dist * 0.01 * (1 + o.w / max(s.W_max, 1.0))
                     expected_move_cost = cost_empty + cost_loaded
-                    
+
                     pure_profit = marginal - expected_move_cost
-                    
+
                     # Reject unprofitable orders entirely if map is dense
                     if pure_profit <= profit_threshold:
                         continue

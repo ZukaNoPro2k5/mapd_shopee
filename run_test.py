@@ -33,7 +33,6 @@ SOLVER_SOURCES = [
     ("VRPOrToolsSolver", "vrp_ortools.py"),
     ("ACOSolver", "aco_solver.py"),
     ("MAPDCBSSolver", "mapd_cbs_solver.py"),
-    ("MAPDCBSSolverOld", "mapd_cbs_solver_old.py"),
 ]
 
 
