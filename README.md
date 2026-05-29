@@ -5,6 +5,7 @@ Repo nền cho bài MAPD Graph Shopee. Mục tiêu của repo này là:
 - code thuật toán trong `solvers/`
 - làm việc chung qua Git + VS Code
 - giữ phần chạy đánh giá Kaggle tách biệt, không sửa file grader
+- chú  việc doi duong dan
 
 ## Cấu trúc chính
 
